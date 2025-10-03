@@ -1,5 +1,5 @@
 output "compute_node_public_ip" {
-  value = hcloud_server.slurm_cluster_compute.ipv4_address
+  value = hcloud_server.slurm_cluster_compute[0].ipv4_address
 }
 
 output "controller_node_public_ip" {

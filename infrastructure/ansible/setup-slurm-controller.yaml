@@ -105,13 +105,6 @@
         dest: files/munge/controller-munge.key
         flat: yes
 
-    - name: Fetch slurm config builder
-      become: true
-      ansible.builtin.fetch:
-        src: /usr/share/doc/slurmctld/slurm-wlm-configurator.html
-        dest: files/slurm/slurm-wlm-configurator.html
-        flat: yes
-
     - name: Set owner/group recursively for munge directories
       become: true
       ansible.builtin.file:

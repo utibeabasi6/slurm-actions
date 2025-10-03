@@ -100,16 +100,31 @@ slurm-cluster-compute-1 ansible_host=<compute_node_public_ip> ansible_user=slurm
 
 Replace placeholders with actual values:
 - `<controller_node_public_ip>`: Output from Terraform
-- `<compute_node_public_ip>`: Output from Terraform  
+- `<compute_node_public_ip>`: Output from Terraform
 - `<path_to_bastion_private_key>`: Path to your bastion private key (e.g., `/Users/username/.ssh/bastion`)
 
-### 5. Slurm Cluster Setup
+### 5. Slurm Configuration Update
+
+Before running the Ansible playbooks, update the Slurm configuration file:
+
+1. Edit `infrastructure/ansible/files/slurm/slurm.conf` and replace `SLURM_COMPUTE_NODE_IP` with the actual IP address of your compute node (the `compute_node_public_ip` from Terraform output).
+
+### 6. Slurm Cluster Setup
 
 Set up the controller node:
 
 ```bash
 ansible-playbook -i inventory.ini setup-slurm-controller.yaml
 ```
+
+**Note**: If the controller setup fails due to MySQL package issues, SSH into the controller node and run:
+
+```bash
+ssh -i <path_to_bastion_private_key> slurm@<controller_node_public_ip>
+sudo apt --fix-broken install -y
+```
+
+Then re-run the controller playbook.
 
 Set up the compute node:
 
@@ -119,12 +134,35 @@ ansible-playbook -i inventory.ini setup-slurm-compute.yaml \
   --extra-vars slurm_controller_hostname=slurm-cluster-controller
 ```
 
-### 6. GitHub Webhook Service
+### 7. Configure Environment Variables
+
+Create a `.env` file in the `ghwebhooks/crates/rabbitmq-worker/` directory with the following variables:
+
+```bash
+cd ../../ghwebhooks/crates/rabbitmq-worker
+```
+
+Create `.env` file:
+
+```env
+GHWEBHOOKS_RMQ_CONSUMER_GITHUB_TOKEN=your_github_token_here
+GHWEBHOOKS_RMQ_CONSUMER_SLURMRESTD_HOST=<controller_node_public_ip>
+GHWEBHOOKS_RMQ_CONSUMER_SLURMRESTD_PORT=6820
+GHWEBHOOKS_RMQ_CONSUMER_SLURMRESTD_USER=slurm
+GHWEBHOOKS_RMQ_CONSUMER_SLURMRESTD_TOKEN=your_slurm_token_here
+```
+
+**To get the Slurm token**:
+1. SSH into the controller node: `ssh -i <path_to_bastion_private_key> slurm@<controller_node_public_ip>`
+2. Run: `scontrol token`
+3. Copy the token value and paste it in the `.env` file
+
+### 8. GitHub Webhook Service
 
 Navigate to the webhook service directory:
 
 ```bash
-cd ../../ghwebhooks
+cd ../../../ghwebhooks
 ```
 
 Start the API server:
@@ -139,7 +177,7 @@ In a separate terminal, start the RabbitMQ worker:
 cargo run --bin rabbitmq-worker
 ```
 
-### 7. Expose API with ngrok
+### 9. Expose API with ngrok
 
 To make your API accessible to GitHub webhooks, expose it using ngrok.
 

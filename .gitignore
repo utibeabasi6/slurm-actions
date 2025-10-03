@@ -6,3 +6,4 @@ target
 *.tfstate*
 inventory.ini
 *munge.key
+slurm-wlm-configurator*
