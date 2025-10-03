@@ -1,3 +1,5 @@
+// TODO: file too long, refactor
+// Add better error handling and logging with tracing crate
 use crate::services::create_rabbitmq_consumer;
 use futures_util::stream::StreamExt;
 use glob::glob;
