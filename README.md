@@ -287,10 +287,6 @@ systemctl status slurmdbd
 4. Test thoroughly
 5. Submit a pull request
 
-## License
-
-[Add your license information here]
-
 ## Support
 
 For issues and questions:
