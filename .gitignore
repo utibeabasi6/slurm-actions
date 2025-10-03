@@ -1,0 +1,8 @@
+.env
+*.db
+target
+.tfvars
+.terraform*
+*.tfstate*
+inventory.ini
+*munge.key

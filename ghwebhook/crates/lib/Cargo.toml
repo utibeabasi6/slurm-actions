@@ -1,0 +1,13 @@
+[package]
+name = "lib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+config = "0.15.17"
+git2 = "0.20.2"
+rabbitmq-stream-client = "0.9.0"
+rocket = "0.5.1"
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.17"
+workspace-hack = { version = "0.1", path = "../../workspace-hack" }

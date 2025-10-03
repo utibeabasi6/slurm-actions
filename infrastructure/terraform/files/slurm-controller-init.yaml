@@ -1,0 +1,18 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - unzip
+  - curl
+  - git
+  - ca-certificates
+  - gnupg
+  - lsb-release
+
+users:
+  - name: slurm
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh-authorized-keys:
+      - ${bastion_public_key}
+      - ${compute_public_key}

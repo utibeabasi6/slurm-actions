@@ -1,0 +1,23 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - unzip
+  - curl
+  - git
+  - ca-certificates
+  - gnupg
+  - lsb-release
+
+write_files:
+  - path: /root/.ssh/id_rsa
+    permissions: "0600"
+    content: |
+      ${indent(6, compute_private_key)}
+
+users:
+  - name: slurm
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh-authorized-keys:
+      - ${bastion_public_key}

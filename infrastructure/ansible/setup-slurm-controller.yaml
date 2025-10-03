@@ -1,0 +1,194 @@
+---
+- name: Setup Slurm Controller
+  hosts: controller
+  tasks:
+    - name: Run apt update and upgrade
+      become: true
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: "safe"
+
+    - name: Install required packages
+      become: true
+      ansible.builtin.apt:
+        force_apt_get: true
+        update_cache: true
+        pkg:
+          - munge
+          - libmunge2
+          - libmunge-dev
+          - slurm-wlm
+          - slurmrestd
+          - slurmdbd
+          - mysql-server-8.0
+          - mysql-server
+          - python3
+          - python3-pip
+          - python3-venv
+          - build-essential
+          - default-libmysqlclient-dev
+          - python3-pymysql
+          - slurm-wlm-jwt-plugin
+
+    - name: Ensure MySQL is running
+      become: true
+      ansible.builtin.systemd:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Create Slurm accounting database
+      become: true
+      community.mysql.mysql_db:
+        name: slurm_acct_db
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Create Slurm MySQL user
+      become: true
+      community.mysql.mysql_user:
+        name: slurm
+        password: "slurmdbdpass"
+        priv: "slurm_acct_db.*:ALL"
+        host: localhost
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Create JWT key file if it doesn't exist
+      become: true
+      ansible.builtin.command:
+        cmd: dd if=/dev/random of=/etc/slurm/jwt_hs256.key bs=32 count=1
+        creates: /etc/slurm/jwt_hs256.key
+
+    - name: Set ownership on JWT key
+      become: true
+      ansible.builtin.file:
+        path: /etc/slurm/jwt_hs256.key
+        owner: slurm
+        group: slurm
+
+    - name: Set permissions on JWT key
+      become: true
+      ansible.builtin.file:
+        path: /etc/slurm/jwt_hs256.key
+        mode: "0600"
+
+    - name: Ensure local directories exist
+      delegate_to: localhost
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - files/munge
+        - files/slurm
+
+    - name: Copy slurmdbd conf to controller
+      ansible.builtin.copy:
+        src: files/slurm/slurmdbd.conf
+        dest: /etc/slurm/slurmdbd.conf
+        owner: slurm
+        group: slurm
+        mode: "0600"
+      become: yes
+
+    - name: Ensure slurmdbd is enabled and running
+      become: true
+      ansible.builtin.systemd:
+        name: slurmdbd
+        state: restarted
+        enabled: yes
+
+    - name: Fetch the controller munge key
+      become: true
+      ansible.builtin.fetch:
+        src: /etc/munge/munge.key
+        dest: files/munge/controller-munge.key
+        flat: yes
+
+    - name: Fetch slurm config builder
+      become: true
+      ansible.builtin.fetch:
+        src: /usr/share/doc/slurmctld/slurm-wlm-configurator.html
+        dest: files/slurm/slurm-wlm-configurator.html
+        flat: yes
+
+    - name: Set owner/group recursively for munge directories
+      become: true
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: munge
+        group: munge
+        recurse: yes
+      loop:
+        - /etc/munge/
+        - /var/log/munge/
+        - /var/lib/munge/
+        - /run/munge/
+
+    - name: Set strict mode on munge directories
+      become: true
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: "0700"
+      loop:
+        - /etc/munge/
+        - /var/log/munge/
+        - /var/lib/munge/
+
+    - name: Set mode 0755 on /run/munge
+      become: true
+      ansible.builtin.file:
+        path: /run/munge/
+        mode: "0755"
+
+    - name: Set mode 0700 on munge.key
+      become: true
+      ansible.builtin.file:
+        path: /etc/munge/munge.key
+        owner: munge
+        group: munge
+        mode: "0700"
+
+    - name: Ensure munge is enabled and running
+      become: true
+      ansible.builtin.systemd:
+        name: munge
+        state: restarted
+        enabled: yes
+
+    - name: Copy slurm conf to controller
+      ansible.builtin.copy:
+        src: files/slurm/slurm.conf
+        dest: /etc/slurm/slurm.conf
+        owner: slurm
+        group: slurm
+        mode: "0700"
+      become: yes
+
+    - name: Ensure slurmctld is enabled and running
+      become: true
+      ansible.builtin.systemd:
+        name: slurmctld
+        state: restarted
+        enabled: yes
+
+    - name: Copy slurmrestd service to controller node
+      ansible.builtin.copy:
+        src: files/slurm/slurmrestd.service
+        dest: /etc/systemd/system/slurmrestd.service
+        owner: root
+        group: root
+        mode: "0755"
+      become: yes
+
+    - name: Reload systemd daemon
+      become: true
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Start slurmrestd service on controller node
+      become: true
+      ansible.builtin.systemd:
+        name: slurmrestd
+        state: restarted
+        enabled: yes

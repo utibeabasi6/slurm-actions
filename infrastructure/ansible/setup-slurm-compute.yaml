@@ -1,0 +1,107 @@
+---
+- name: Setup Slurm Compute
+  hosts: compute
+  tasks:
+    - name: Run apt update and upgrade
+      become: true
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: "safe"
+
+    - name: Install required packages
+      become: true
+      ansible.builtin.apt:
+        force_apt_get: true
+        update_cache: true
+        pkg:
+          - munge
+          - libmunge2
+          - libmunge-dev
+          - slurm-wlm
+          - mailutils
+          - zip
+
+    - name: Copy slurm conf to controller
+      ansible.builtin.copy:
+        src: files/munge/controller-munge.key
+        dest: /etc/munge/munge.key
+        owner: munge
+        group: munge
+        mode: "0700"
+      become: yes
+
+    - name: Set owner/group recursively for munge directories
+      become: true
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: munge
+        group: munge
+        recurse: yes
+      loop:
+        - /etc/munge/
+        - /var/log/munge/
+        - /var/lib/munge/
+        - /run/munge/
+
+    - name: Set strict mode on munge directories
+      become: true
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: "0700"
+      loop:
+        - /etc/munge/
+        - /var/log/munge/
+        - /var/lib/munge/
+
+    - name: Set mode 0755 on /run/munge
+      become: true
+      ansible.builtin.file:
+        path: /run/munge/
+        mode: "0755"
+
+    - name: Set mode 0700 on munge.key
+      become: true
+      ansible.builtin.file:
+        path: /etc/munge/munge.key
+        owner: munge
+        group: munge
+        mode: "0700"
+
+    - name: Ensure munge is enabled and running
+      become: true
+      ansible.builtin.systemd:
+        name: munge
+        state: restarted
+        enabled: yes
+
+    - name: Copy slurm conf to compute node
+      ansible.builtin.copy:
+        src: files/slurm/slurm.conf
+        dest: /etc/slurm/slurm.conf
+        owner: slurm
+        group: slurm
+        mode: "0700"
+      become: yes
+
+    - name: Ensure slurmdbd password file exists
+      become: yes
+      ansible.builtin.copy:
+        dest: /etc/slurm/slurmdbdpass.socket.2
+        content: "slurmdbdpass\n"
+        owner: slurm
+        group: slurm
+        mode: "0600"
+
+    - name: Ensure slurm controller is in /etc/hosts
+      become: yes
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ slurm_controller_ip }}   {{ slurm_controller_hostname }}"
+        state: present
+
+    - name: Ensure slurmd is enabled and running
+      become: true
+      ansible.builtin.systemd:
+        name: slurmd
+        state: restarted
+        enabled: yes
